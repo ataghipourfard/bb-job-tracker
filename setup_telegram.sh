@@ -12,6 +12,23 @@ set -euo pipefail
 command -v gh >/dev/null || { echo "gh CLI not found — install it first." >&2; exit 1; }
 command -v python3 >/dev/null || { echo "python3 not found." >&2; exit 1; }
 
+# gh prefers $GITHUB_TOKEN / $GH_TOKEN over its own stored login, so a stale
+# one exported from a shell profile makes every call fail with "Bad
+# credentials" even though `gh auth login` is perfectly healthy. If that is
+# happening, fall back to the stored login for the calls we make here.
+GH=(gh)
+if ! gh auth status >/dev/null 2>&1; then
+    if env -u GITHUB_TOKEN -u GH_TOKEN gh auth status >/dev/null 2>&1; then
+        GH=(env -u GITHUB_TOKEN -u GH_TOKEN gh)
+        echo "  Note: ignoring a stale GITHUB_TOKEN/GH_TOKEN from your environment."
+        echo "        Your stored gh login works; consider removing that export."
+        echo
+    else
+        echo "gh is not authenticated. Run: gh auth login -h github.com" >&2
+        exit 1
+    fi
+fi
+
 api() { curl -sS --max-time 20 "https://api.telegram.org/bot${TOKEN}/$1" "${@:2}"; }
 
 printf 'Telegram bot token (input hidden): '
@@ -92,13 +109,13 @@ fi
 # 4. Save it. The chat ID is an address, not a credential; the token below is
 #    only re-sent if you ask for it.
 echo
-printf '%s' "$CHAT_ID" | gh secret set TELEGRAM_CHAT_ID
+printf '%s' "$CHAT_ID" | "${GH[@]}" secret set TELEGRAM_CHAT_ID
 echo "  TELEGRAM_CHAT_ID updated."
 
 printf '\nAlso re-save the bot token as TELEGRAM_BOT_TOKEN? [y/N] '
 read -r ANSWER
 if [ "$ANSWER" = "y" ] || [ "$ANSWER" = "Y" ]; then
-    printf '%s' "$TOKEN" | gh secret set TELEGRAM_BOT_TOKEN
+    printf '%s' "$TOKEN" | "${GH[@]}" secret set TELEGRAM_BOT_TOKEN
     echo "  TELEGRAM_BOT_TOKEN updated."
 fi
 
