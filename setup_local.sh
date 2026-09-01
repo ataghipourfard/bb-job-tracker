@@ -21,6 +21,21 @@ api() { curl -sS --max-time 20 "https://api.telegram.org/bot${TOKEN}/$1" "${@:2}
 echo "bb-job-tracker — local schedule setup"
 echo
 
+# launchd agents cannot write to USB-attached volumes, so a clone on an
+# external disk can never update jobs.json. Refuse rather than install an
+# agent that will fail every 15 minutes.
+case "$REPO" in
+  /Volumes/*)
+    echo "This clone lives on an external volume ($REPO)." >&2
+    echo "macOS denies launchd agents write access there, so the scheduled run" >&2
+    echo "could not update jobs.json. Use a clone on the internal drive:" >&2
+    echo >&2
+    echo "  git clone https://github.com/ataghipourfard/bb-job-tracker.git ~/bb-job-tracker" >&2
+    echo "  cd ~/bb-job-tracker && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" >&2
+    echo "  ./setup_local.sh" >&2
+    exit 1 ;;
+esac
+
 [ -x "$REPO/.venv/bin/python" ] || { echo "Missing $REPO/.venv — run: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" >&2; exit 1; }
 
 # ---- credentials -----------------------------------------------------------
