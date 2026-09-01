@@ -2,9 +2,13 @@ name: Job tracker
 
 on:
   schedule:
-    # Every 15 minutes. GitHub queues scheduled runs on a best-effort basis,
-    # so expect the occasional late or skipped tick.
-    - cron: "*/15 * * * *"
+    # Every 15 minutes, deliberately offset off the quarter-hour.
+    #
+    # "*/15" puts the job on :00/:15/:30/:45 — the four most contended minutes
+    # on the whole platform, because that is what everyone writes. GitHub
+    # queues scheduled runs on a best-effort basis and sheds load at exactly
+    # those minutes, so odd offsets get picked up far more reliably.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 # Let a run finish before the next one starts, so two runs never race to

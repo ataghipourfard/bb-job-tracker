@@ -218,9 +218,14 @@ being silently lost.
 
 ## Known limits
 
-* **Scheduled runs are best-effort.** GitHub does not guarantee the
-  `*/15 * * * *` cron fires on time, and it can skip ticks when the platform
-  is busy. Treat 15 minutes as a floor, not a promise.
+* **Scheduled runs are best-effort.** GitHub does not guarantee the cron
+  fires on time and can skip ticks when the platform is busy. Treat 15
+  minutes as a floor, not a promise. The schedule is deliberately set to
+  `7,22,37,52` rather than `*/15`: the quarter-hour marks are the most
+  contended minutes on the platform and get shed first. If the schedule
+  still never fires, `gh workflow run "Job tracker" --ref main` always
+  works, and an external pinger hitting the `workflow_dispatch` REST
+  endpoint is the usual fallback.
 * **"Salaried" is not filtered on.** The scrapers pull *every* posted role at
   each company near you, hourly and salaried alike, across all categories —
   which is what you want from stopgap employers. Narrow it with
