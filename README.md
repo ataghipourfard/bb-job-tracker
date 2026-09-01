@@ -90,6 +90,44 @@ the cron schedule takes over.
 
 ---
 
+## Running it on a Mac every 15 minutes
+
+GitHub's scheduler is best-effort and may not fire for hours. For a punctual
+15-minute cadence, run it locally with `launchd` as well — the two coexist,
+because each run pulls before it starts and pushes `jobs.json` after, so
+whichever runs first wins and the other simply sees no new listings.
+
+```bash
+./setup_local.sh
+```
+
+That prompts for the bot token with the input hidden, verifies it, sends a
+test message, writes `~/.config/bb-job-tracker/env` at mode 600, then installs
+and starts a launchd agent. It runs every 15 minutes and again at every login.
+
+```bash
+tail -f ~/Library/Logs/bb-job-tracker/run.log        # watch it
+launchctl kickstart -k gui/$UID/com.ataghipourfard.bb-job-tracker   # run now
+launchctl bootout gui/$UID/com.ataghipourfard.bb-job-tracker        # stop it
+```
+
+Three things about this setup are worth knowing:
+
+* **Keep the scheduled clone on the internal drive.** macOS denies launchd
+  agents write access to USB-attached volumes: an agent can read and execute
+  from an external disk but cannot write to it, so `jobs.json` would never
+  update and `StandardOutPath` there fails the job outright with `EX_CONFIG`.
+  The logs and lock file therefore live under `~/Library/Logs` regardless.
+* **The Mac must stay awake.** `pmset -g` shows the idle sleep timer; a
+  desktop wants `sudo pmset -a sleep 0`. launchd does not wake a sleeping
+  Mac, and missed intervals collapse into a single catch-up run on wake — so
+  sleeping costs timeliness, not coverage.
+* **FileVault blocks unattended start.** After a power cut the disk stays
+  locked until someone logs in, and no agent — user or system — runs before
+  that. The agent starts automatically the moment you do log in.
+
+---
+
 ## Tuning it
 
 Everything you are likely to change is at the top of [`main.py`](main.py):
