@@ -32,6 +32,14 @@ geocache.json      city -> coordinates, so we rarely hit the geocoder
    Find `"chat":{"id":123456789` in the response. That number is your
    **TELEGRAM_CHAT_ID**.
 
+If Telegram answers `Bad Request: chat not found` when an alert goes out, it
+almost always means step 2 was skipped — a bot cannot start a conversation,
+so you have to message it first. `setup_telegram.sh` checks for exactly that.
+
+Or skip steps 1-2 below and run [`setup_telegram.sh`](setup_telegram.sh),
+which finds the chat ID, sends a test message and stores the secret for you.
+It reads the token from a hidden prompt and never writes it to disk.
+
 ### 2. Add the two repository secrets
 
 In the repository on GitHub: **Settings → Secrets and variables → Actions →
