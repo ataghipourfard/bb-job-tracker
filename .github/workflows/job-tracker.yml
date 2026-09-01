@@ -1,0 +1,70 @@
+name: Job tracker
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub queues scheduled runs on a best-effort basis,
+    # so expect the occasional late or skipped tick.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# Let a run finish before the next one starts, so two runs never race to
+# commit jobs.json.
+concurrency:
+  group: job-tracker
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  check-for-jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # None of the current scrapers need a browser: all four careers sites
+      # have JSON APIs behind their search. If you add a scraper that needs
+      # Playwright, add `playwright` to requirements.txt and uncomment this.
+      # - name: Install Playwright browsers
+      #   run: python -m playwright install --with-deps chromium
+
+      - name: Check for new jobs and send alerts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
+
+      - name: Commit the updated job state
+        run: |
+          if [ -z "$(git status --porcelain jobs.json geocache.json)" ]; then
+            echo "No change to jobs.json or geocache.json."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add jobs.json geocache.json
+          git commit -m "Update seen jobs ($(date -u '+%Y-%m-%d %H:%M UTC'))"
+
+          # Rebase in case something else landed on the branch mid-run.
+          for attempt in 1 2 3; do
+            if git pull --rebase --autostash && git push; then
+              exit 0
+            fi
+            echo "Push attempt $attempt failed; retrying."
+            sleep 5
+          done
+          echo "Could not push the updated job state." >&2
+          exit 1

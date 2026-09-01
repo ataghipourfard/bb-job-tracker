@@ -1,0 +1,5 @@
+requests>=2.31
+
+# Not used by the four scrapers here — all four have JSON APIs — but kept
+# installed so a scraper you add later can parse HTML without touching CI.
+beautifulsoup4>=4.12
