@@ -4,3 +4,7 @@ __pycache__/
 venv/
 .env
 .DS_Store
+.local-run.log
+.local-run.lock/
+.launchd.out.log
+.launchd.err.log
