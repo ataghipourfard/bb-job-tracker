@@ -14,7 +14,7 @@ LABEL="com.ataghipourfard.bb-job-tracker"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 ENV_DIR="$HOME/.config/bb-job-tracker"
 ENV_FILE="$ENV_DIR/env"
-INTERVAL=900   # seconds — 15 minutes
+INTERVAL=300   # seconds — 5 minutes
 
 api() { curl -sS --max-time 20 "https://api.telegram.org/bot${TOKEN}/$1" "${@:2}"; }
 
@@ -151,7 +151,7 @@ launchctl enable "gui/$(id -u)/$LABEL"
 
 echo "  Agent installed at $PLIST and started."
 echo
-echo "It now runs every 15 minutes, and again automatically each time you log in."
+echo "It now runs every 5 minutes, and again automatically each time you log in."
 echo
 echo "  Status:  launchctl print gui/$(id -u)/$LABEL | head -20"
 echo "  Log:     tail -f $HOME/Library/Logs/bb-job-tracker/run.log"

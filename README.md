@@ -90,10 +90,10 @@ the cron schedule takes over.
 
 ---
 
-## Running it on a Mac every 15 minutes
+## Running it on a Mac every 5 minutes
 
 GitHub's scheduler is best-effort and may not fire for hours. For a punctual
-15-minute cadence, run it locally with `launchd` as well — the two coexist,
+5-minute cadence, run it locally with `launchd` as well — the two coexist,
 because each run pulls before it starts and pushes `jobs.json` after, so
 whichever runs first wins and the other simply sees no new listings.
 
@@ -103,7 +103,10 @@ whichever runs first wins and the other simply sees no new listings.
 
 That prompts for the bot token with the input hidden, verifies it, sends a
 test message, writes `~/.config/bb-job-tracker/env` at mode 600, then installs
-and starts a launchd agent. It runs every 15 minutes and again at every login.
+and starts a launchd agent. It runs every 5 minutes and again at every login. Each run makes roughly 37
+requests across the four careers APIs, so raising the frequency further starts
+to look like scraping rather than checking — `StartInterval` in
+`setup_local.sh` is the knob if you want to back it off again.
 
 ```bash
 tail -f ~/Library/Logs/bb-job-tracker/run.log        # watch it

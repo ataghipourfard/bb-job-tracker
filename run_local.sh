@@ -20,7 +20,7 @@ STATE_DIR="$HOME/Library/Logs/bb-job-tracker"
 mkdir -p "$STATE_DIR"
 LOG="$STATE_DIR/run.log"
 LOCK="$STATE_DIR/run.lock"
-MAX_LOG_LINES=2000
+MAX_LOG_LINES=6000
 
 cd "$REPO" || exit 1
 
