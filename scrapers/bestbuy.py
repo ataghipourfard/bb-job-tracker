@@ -10,9 +10,7 @@ Two details make it work from a script:
 * the endpoint wants ServiceNow's CSRF token (`g_ck`), which is embedded in
   the portal page, so we load the page first and reuse its session cookies;
 * the location filter is not a radius parameter but an encoded bounding box
-  in `options.filters.l`, which we build from the ZIP's coordinates. Best Buy
-  exposes its own unauthenticated geocoder for that, so no third party is
-  needed here.
+  in `options.filters.l`, which we build from the ZIP's coordinates.
 
 The bounding box is a square around the search circle, so it returns slightly
 more than asked for. main.py's haversine check trims the corners off.
@@ -24,13 +22,21 @@ import logging
 import math
 import re
 
-from . import DEFAULT_RADIUS_MILES, DEFAULT_ZIP, REQUEST_TIMEOUT, new_session
+from . import (
+    DEFAULT_RADIUS_MILES,
+    DEFAULT_ZIP,
+    REQUEST_TIMEOUT,
+    home_coordinates,
+    new_session,
+)
 
 log = logging.getLogger(__name__)
 
 COMPANY = "Best Buy"
 PORTAL_URL = "https://jobs.bestbuy.com/bby?id=all_jobs"
-GEOCODE_URL = "https://jobs.bestbuy.com/api/x_nero_bb_career/newrocket_all_jobs_service/nr/loc_coords"
+# Best Buy also exposes an unauthenticated ZIP geocoder here, kept for
+# reference; the cached one in geo.py costs no request at all.
+#   /api/x_nero_bb_career/newrocket_all_jobs_service/nr/loc_coords
 WIDGET_URL = (
     "https://jobs.bestbuy.com/api/now/sp/widget/"
     "dd786d721b71b010b4c011f18c4bcb87?country=US&id=all_jobs&spa=1"
@@ -53,8 +59,12 @@ def _bounding_box(lat: float, lon: float, radius_miles: float) -> str:
     )
 
 
-def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_MILES):
-    """Best Buy requisitions inside a box around `zip_code`."""
+def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_MILES,
+               known_ids: set | None = None):
+    """Best Buy requisitions inside a box around `zip_code`.
+
+    One request returns everything in the box, so `known_ids` is unused here.
+    """
     session = new_session()
 
     page = session.get(PORTAL_URL, timeout=REQUEST_TIMEOUT)
@@ -64,13 +74,7 @@ def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_M
         raise RuntimeError("could not find the ServiceNow g_ck token on the portal page")
     token = match.group(1)
 
-    coords = session.get(
-        GEOCODE_URL,
-        params={"term_type": "zip", "term_val": zip_code, "valid_input": "true"},
-        timeout=REQUEST_TIMEOUT,
-    )
-    coords.raise_for_status()
-    lon, lat = (float(value) for value in coords.json()["result"])
+    lat, lon = home_coordinates(zip_code)
 
     response = session.post(
         WIDGET_URL,

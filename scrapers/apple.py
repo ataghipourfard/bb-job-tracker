@@ -40,7 +40,8 @@ SEARCH_LOCATIONS = ["postLocation-LAMETRO"]
 SEARCH_REGION_STATE = "CA"
 
 RESULTS_PER_PAGE = 20
-MAX_PAGES = 25
+MAX_PAGES = 25        # cold: no stored state yet
+WARM_PAGES = 2        # once we have a baseline
 
 # Apple marks nationwide postings at location level 1 ("United States").
 NATIONWIDE_LEVEL = 1
@@ -68,8 +69,13 @@ def _describe_location(job: dict) -> str:
     return f"{name}, {SEARCH_REGION_STATE}"
 
 
-def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_MILES):
-    """Apple openings in the metro areas listed in SEARCH_LOCATIONS."""
+def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_MILES,
+               known_ids: set | None = None):
+    """Apple openings in the metro areas listed in SEARCH_LOCATIONS.
+
+    Sorted newest-first, so `known_ids` signals that a baseline exists and
+    only the newest WARM_PAGES pages need walking.
+    """
     session = new_session()
 
     # The token is only issued to a session that has loaded the search page.
@@ -80,8 +86,10 @@ def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_M
     if not token:
         raise RuntimeError("Apple did not return an X-Apple-CSRF-Token header")
 
-    jobs, page = [], 1
-    while page <= MAX_PAGES:
+    depth = MAX_PAGES if known_ids is None else WARM_PAGES
+
+    jobs, page, fetched = [], 1, 0
+    while page <= depth:
         response = session.post(
             SEARCH_URL,
             json={
@@ -101,6 +109,7 @@ def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_M
         )
         response.raise_for_status()
         payload = response.json().get("res") or {}
+        fetched += 1
 
         results = payload.get("searchResults") or []
         if not results:
@@ -113,6 +122,7 @@ def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_M
                 continue
 
             slug = job.get("transformedPostingTitle") or "role"
+
             jobs.append(
                 {
                     "id": str(job.get("id") or position_id),
@@ -123,10 +133,11 @@ def fetch_jobs(zip_code: str = DEFAULT_ZIP, radius_miles: int = DEFAULT_RADIUS_M
                 }
             )
 
+
         total = payload.get("totalRecords") or 0
         if page * RESULTS_PER_PAGE >= total:
             break
         page += 1
 
-    log.info("%s: collected %d listings over %d page(s)", COMPANY, len(jobs), page)
+    log.info("%s: collected %d listings in %d request(s)", COMPANY, len(jobs), fetched)
     return jobs

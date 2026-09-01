@@ -103,10 +103,10 @@ whichever runs first wins and the other simply sees no new listings.
 
 That prompts for the bot token with the input hidden, verifies it, sends a
 test message, writes `~/.config/bb-job-tracker/env` at mode 600, then installs
-and starts a launchd agent. It runs every 5 minutes and again at every login. Each run makes roughly 37
-requests across the four careers APIs, so raising the frequency further starts
-to look like scraping rather than checking — `StartInterval` in
-`setup_local.sh` is the knob if you want to back it off again.
+and starts a launchd agent. It runs every 5 minutes and again at every login. A steady-state run costs
+9 HTTP requests in total (see below), so the 5-minute cadence is lighter on
+the careers sites than the original 15-minute one was. `StartInterval` in
+`setup_local.sh` is the knob if you want to change it.
 
 ```bash
 tail -f ~/Library/Logs/bb-job-tracker/run.log        # watch it
@@ -257,6 +257,34 @@ being silently lost.
 
 ---
 
+## Request budget
+
+Each scraper is tuned so a routine run is cheap, and only a run with no
+stored state pays for depth:
+
+| Company | Warm | Cold | Why |
+| --- | --- | --- | --- |
+| Best Buy | 2 | 2 | One widget call returns the whole bounding box |
+| Target | 1 | 1 | Undocumented `pagesize=200` returns every listing at once |
+| Costco | 2 | 10 | Newest-first, so warm runs read only the newest 20 |
+| Apple | 4 | 12 | Newest-first, plus a page load and a CSRF token per run |
+| **Total** | **9** | **25** | |
+
+Two things make the warm number small. Target's search accepts `pagesize`
+up to 200 — beyond that it silently reverts to 15 — which collapses eleven
+requests into one. Costco and Apple are both strictly newest-first, so once
+a baseline exists there is no reason to walk past the first couple of pages;
+`WARM_PAGES` in each sets that depth, and `MAX_PAGES` still applies to a
+first run that has nothing to compare against.
+
+The search centre is geocoded through `geo.py`, so it is served from
+`geocache.json` rather than costing a request per scraper per run.
+
+At the 5-minute local cadence that works out to roughly 2,600 requests a day
+— fewer than the unoptimised scrapers made at 15-minute intervals.
+
+---
+
 ## Known limits
 
 * **Scheduled runs are best-effort.** GitHub does not guarantee the cron
@@ -273,9 +301,7 @@ being silently lost.
   `INCLUDE_KEYWORDS` if you change your mind.
 * **Costco's listings are a catalogue, not live vacancies.** Costco itself
   says these are "the typical kinds of positions that Costco may hire for
-  when openings exist". The scraper reads the 100 most recently posted
-  listings in range (`MAX_PAGES` in `scrapers/costco.py`); raise it to
-  backfill more history.
+  when openings exist".
 * **Apple Retail store roles are posted nationwide.** Apple lists store jobs
   as a single US-wide pipeline requisition instead of one per store, so they
   arrive with no city attached. `INCLUDE_NATIONWIDE = True` is what lets

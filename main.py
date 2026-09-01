@@ -147,8 +147,11 @@ def collect(home: tuple[float, float], state: dict[str, list[str]]):
 
     for module in SCRAPERS:
         company = module.COMPANY
+        known = state.get(company, [])
         try:
-            jobs = module.fetch_jobs(HOME_ZIP, RADIUS_MILES)
+            # Handing over what we have already seen lets date-sorted feeds
+            # stop paging as soon as they reach familiar ground.
+            jobs = module.fetch_jobs(HOME_ZIP, RADIUS_MILES, set(known))
         except Exception:  # noqa: BLE001 — one broken site must not stop the rest
             log.exception("%s: scraper failed; skipping it this run", company)
             continue
@@ -166,7 +169,6 @@ def collect(home: tuple[float, float], state: dict[str, list[str]]):
         log.info("%s: %d listings fetched, %d in range and not filtered out",
                  company, len(jobs), len(kept))
 
-        known = state.get(company, [])
         new = [job for job in kept if job["id"] not in set(known)]
 
         if not known and not ALERT_ON_FIRST_RUN:

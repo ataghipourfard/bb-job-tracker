@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import requests
 
+import geo
+
 DEFAULT_ZIP = "92606"
 DEFAULT_RADIUS_MILES = 15
 
@@ -47,3 +49,15 @@ def new_session() -> requests.Session:
 
 def miles_to_km(miles: float) -> float:
     return miles * 1.609344
+
+
+def home_coordinates(zip_code: str) -> tuple[float, float]:
+    """(lat, lon) for the search centre, served from geocache.json.
+
+    Several scrapers need the search centre. Going through geo means the
+    lookup is cached on disk, so a warm run spends no network calls on it.
+    """
+    coords = geo.geocode_zip(zip_code)
+    if coords is None:
+        raise RuntimeError(f"could not geocode ZIP {zip_code}")
+    return coords
