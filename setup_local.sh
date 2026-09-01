@@ -69,9 +69,20 @@ if [ -n "$CHATS" ]; then
 else
     CHAT_ID=""
 fi
-printf 'Chat ID to alert%s: ' "${CHAT_ID:+ [$CHAT_ID]}"
-read -r PICK
-[ -n "$PICK" ] && CHAT_ID="$PICK"
+# Accept a single discovered chat without asking; otherwise prompt, and keep
+# asking until the answer is actually a chat ID (digits, optionally negative
+# for groups). Anything else is a typo, not an address.
+if [ "$(echo "$CHATS" | grep -c .)" = "1" ] && [ -n "$CHAT_ID" ]; then
+    echo "  Using chat $CHAT_ID."
+else
+    while true; do
+        printf 'Chat ID to alert%s (press Enter to accept): ' "${CHAT_ID:+ [$CHAT_ID]}"
+        read -r PICK
+        [ -z "$PICK" ] && [ -n "$CHAT_ID" ] && break
+        if echo "$PICK" | grep -qE '^-?[0-9]+$'; then CHAT_ID="$PICK"; break; fi
+        echo "  '$PICK' is not a chat ID — it must be digits, e.g. 97252702."
+    done
+fi
 [ -n "$CHAT_ID" ] || { echo "No chat ID. Message your bot first, then re-run." >&2; exit 1; }
 
 echo "  Sending a test message..."

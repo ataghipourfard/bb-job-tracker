@@ -87,9 +87,13 @@ echo
 CHAT_ID=$(echo "$CHATS" | head -1 | cut -f1)
 COUNT=$(echo "$CHATS" | wc -l | tr -d ' ')
 if [ "$COUNT" -gt 1 ]; then
-    printf 'Chat ID to send alerts to [%s]: ' "$CHAT_ID"
-    read -r PICK
-    [ -n "$PICK" ] && CHAT_ID="$PICK"
+    while true; do
+        printf 'Chat ID to send alerts to [%s] (press Enter to accept): ' "$CHAT_ID"
+        read -r PICK
+        [ -z "$PICK" ] && break
+        if echo "$PICK" | grep -qE '^-?[0-9]+$'; then CHAT_ID="$PICK"; break; fi
+        echo "  '$PICK' is not a chat ID — it must be digits."
+    done
 fi
 
 # 3. Prove it works before saving it.
